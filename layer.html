@@ -1,0 +1,78 @@
+<html>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script type="text/javascript" src='remix.js'></script>
+
+<script type="text/javascript">
+  var apiKey = 'K212YFPESMSVJMRJY';
+  var trackID = 'TRCYWPQ139279B3308';
+  var track1URL = 'audio/illgates_sweatshop.mp3'
+  var track2URL = 'audio/jayz_youngforever.mp3'
+
+
+  var context;
+  var track2Buffer;
+
+  var remixer;
+  var player;
+  var track;
+  var remixed;
+
+
+
+  function init() {
+    if (window.webkitAudioContext === undefined) {
+      error("Sorry, this app needs advanced web audio. Your browser doesn't"
+        + " support it. Try the latest version of Chrome");
+    } else {
+      context = new webkitAudioContext();
+
+      // Load track2bell
+      var request = new XMLHttpRequest();
+      request.open('GET', track2URL, true);
+      request.responseType = 'arraybuffer';
+
+      request.onload = function() {
+      context.decodeAudioData(request.response, function(buffer) {
+        track2Buffer = buffer;
+      });
+      }
+      request.send();
+
+
+      remixer = createJRemixer(context, $, apiKey);
+      player = remixer.getPlayer();
+      $("#info").text("Loading analysis data...");
+
+      remixer.remixTrackById(trackID, track1URL, function(t, percent) {
+        track = t;
+
+        $("#info").text(percent + "% of the track loaded");
+        if (percent == 100) {
+          $("#info").text(percent + "% of the track loaded, remixing...");
+        }
+
+        if (track.status == 'ok') {
+          remixed = track.analysis.beats;
+          for (var i=0; i < remixed.length; i++) {
+            if (i % 2 == 1) {
+              remixed[i].syncBuffer = track2Buffer;
+            }
+          }
+          $("#info").text("Remix complete!");
+        }
+      });
+    }
+  }
+
+
+window.onload = init;
+</script>
+
+<body>
+Plays two tracks on top of one another
+<div id='info'> </div>
+<button onClick="player.play(0, remixed);">Play!</button>
+<button onClick="player.stop();">Stop!</button>
+</body>
+
+</html>
