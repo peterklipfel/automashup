@@ -17,8 +17,10 @@ assert len(sys.argv) == 4, "Incorrect usage.\n\tpingPong.py <song1.mp3> <song2.m
 # This test script takes two songs as input and creates one output song with
 # alternating bars from the 2 songs.  Output written to mp3 file.
 
-audio_file1 = audio.LocalAudioFile('../songs/02-far_too_loud-megaloud-alki.mp3')#sys.argv[1])
-audio_file2 = audio.LocalAudioFile('../songs/MordFustang-LickTheRainbow.mp3')#sys.argv[2])
+audio_file1 = audio.LocalAudioFile(sys.argv[1])
+audio_file2 = audio.LocalAudioFile(sys.argv[2])
+#audio_file1 = audio.LocalAudioFile('../songs/02-far_too_loud-megaloud-alki.mp3')#sys.argv[1])
+#audio_file2 = audio.LocalAudioFile('../songs/MordFustang-LickTheRainbow.mp3')#sys.argv[2])
 
 # Analyse songs on soundcloud to segment.
 beats1 = audio_file1.analysis.beats
