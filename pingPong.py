@@ -3,6 +3,9 @@ import sys
 import time
 import echonest.remix.audio as audio
 
+def swap(a,b):
+    return b,a
+
 start_time = time.time()
 
 # Usage:
@@ -14,17 +17,38 @@ assert len(sys.argv) == 4, "Incorrect usage.\n\tpingPong.py <song1.mp3> <song2.m
 # This test script takes two songs as input and creates one output song with
 # alternating bars from the 2 songs.  Output written to mp3 file.
 
-audio_file1 = audio.LocalAudioFile(sys.argv[1])
-audio_file2 = audio.LocalAudioFile(sys.argv[2])
+audio_file1 = audio.LocalAudioFile('../songs/02-far_too_loud-megaloud-alki.mp3')#sys.argv[1])
+audio_file2 = audio.LocalAudioFile('../songs/MordFustang-LickTheRainbow.mp3')#sys.argv[2])
 
 # Analyse songs on soundcloud to segment.
 beats1 = audio_file1.analysis.beats
 beats2 = audio_file2.analysis.beats
 
-# Construct alternating segments result.
-beats1.reverse()
+# Swap so file 1 is the longest
+if len(beats1) < len(beats2):
+    beats1, beats2 = swap( beats1, beats2 )
+    audio_file1, audio_file2 = swap( audio_file1, audio_file2 )
+
+assert len(beats1) >= len(beats2)
+
+# Start output with first segment of beats1
+afout = audio_file1[ beats1[0] ]
+
+# Construct alternating segments result. Don't use last beat in case same len
+nb = len(beats2)-1
+# use this for quick result
+#nb = 100
+
+i = 1
+for b1,b2 in zip( beats1[1:nb], beats2[:nb] ):
+    print 'Beat pair %d of %d: %s, %s' % (i,nb, str(b1), str(b2))
+    # add next beat from song 2
+    afout += audio_file2[b2]
+    # add next beat from song 1
+    afout += audio_file1[b1]
+    i += 1
 
 # Write output file
-audio.getpieces(audio_file1, beats1).encode( sys.argv[3] )
+afout.encode( sys.argv[3] )
 
 print "pingPong execution time: ", time.time() - start_time, " seconds"
