@@ -32,21 +32,28 @@ if len(beats1) < len(beats2):
 assert len(beats1) >= len(beats2)
 
 # Start output with first segment of beats1
-afout = audio_file1[ beats1[0] ]
+#afout = audio_file1[ beats1[0] ]
+#afout = audio.AudioData( shape=(audio_file1.data.shape[0]+audio_file2.data.shape[1],2), sampleRate=audio_file1.sampleRate, \
+#                            numChannels=audio_file1.numChannels)
 
 # Construct alternating segments result. Don't use last beat in case same len
-nb = len(beats2)-1
+nb = len(beats2)
 # use this for quick result
 #nb = 100
 
 i = 1
-for b1,b2 in zip( beats1[1:nb], beats2[:nb] ):
+# make a list of audio segments
+alist = []
+for b1,b2 in zip( beats1[:nb], beats2[:nb] ):
     print 'Beat pair %d of %d: %s, %s' % (i,nb, str(b1), str(b2))
     # add next beat from song 2
-    afout += audio_file2[b2]
+    alist.append( audio_file2[b2] )
     # add next beat from song 1
-    afout += audio_file1[b1]
+    alist.append( audio_file1[b1] )
     i += 1
+
+# construct output waveform from these audiodata objects.
+afout = audio.assemble( alist )
 
 # Write output file
 afout.encode( sys.argv[3] )
