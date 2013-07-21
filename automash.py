@@ -84,6 +84,10 @@ def playRegion( adata, rtype, rgnIdx ):
     aout.encode('/tmp/noplay.wav')
     os.system( 'aplay /tmp/noplay.wav' )
 
+def playAudioData( adata ):
+    adata.encode('/tmp/noplay.wav')
+    os.system( 'aplay /tmp/noplay.wav' )
+
 def docheck( clsec, clSection, currSec ):
     assert clSection in range( clsec.nbClusters() ), 'clSection=%d out of range [0,%d)' % (clSection,clsec.nbClusters())
     assert currSec in range( clsec.nbRegions() ), 'currSec=%d out of range [0,%d)' % (currSec, clsec.nbRegions())
@@ -142,8 +146,13 @@ while True:
                 if warmUpCounter == 0:
                     print 'MASHING...'
             else:
-                playRegion( csong.m_adata, 'sections', \
-                                clsec.getSongRegionIdx(currSec) )
+                rgnIdx = clsec.getSongRegionIdx(currSec) # an int
+                allSectionsForSong = cluster.getRegionsOfType( \
+                    csong.m_adata.analysis, 'sections' ) # array of quanta
+                secAData = csong.m_adata[ allSectionsForSong[rgnIdx] ]
+                addBarsToAudio( sedAData, ... )
+                addBeatsToAudio( sedAData, ... )
+                playAudioData( secAData )
         # todo: keep a history and don't go back too early?
         # todo: pick same key?
 
