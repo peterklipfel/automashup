@@ -47,10 +47,12 @@ def computeFeatureVector( aregion ):
 def createFeatureMatrixSongs( rtype, songFns ):
     D = None
     segFns = []
+    segIdxs = []
     for fn in songFns:
         au = audio.LocalAudioFile(fn)
         regs = getRegionsOfType( au.analysis, rtype )
         segFns += [fn for kk in regs]
+        segIdxs += range( len(regs) )
         if dbg:
             print '\tClustering %d %s regions for this song' % (len(regs),rtype)
         if D==None:
@@ -60,7 +62,8 @@ def createFeatureMatrixSongs( rtype, songFns ):
         if dbg:
             print '\tFeature matrix has grown to size ', D.shape
     assert len(segFns) == D.shape[0]
-    return (D, segFns)
+    assert len(segIdxs) == D.shape[0]
+    return (D, segFns, segIdxs)
 
 def createFeatureMatrix( aregionList ):
     n = len(aregionList)
@@ -136,7 +139,8 @@ class ClusterInfo:
     def __init__(self, rtype, songFileList):
         self.m_rtype = rtype
         # n x D matrix
-        (X,self.m_songFns) = createFeatureMatrixSongs( rtype, songFileList )
+        (X,self.m_songFns,self.m_regionIdx) = createFeatureMatrixSongs( \
+            rtype, songFileList )
 
         if dbg:
             print 'Size of full feature matrix = ', X.shape
@@ -155,6 +159,9 @@ class ClusterInfo:
 
     def nbClusters( self ):
         return self.m_clusterCentres.shape[0]
+
+    def nbRegions( self ):
+        return len(self.m_clusterIds)
 
     def sizeOfCluster( self, clid ):
         return np.count_nonzero( self.m_clusterIds == clid )
@@ -178,3 +185,11 @@ class ClusterInfo:
         while self.nbClusters()>1 and res == currCluster:
             res = weighted_pick( self.m_clusterTransProbs[currCluster,:], 1 )
         return res
+
+    def getFilenameOfRegion( self, rgnIdx ):
+        return self.m_songFns[rgnIdx]
+
+    def getSongRegionIdx( self, currRegion ):
+        # currRegion is index into ALL regions at this level. Convert to 
+        # song-level index.
+        return self.m_regionIdx[currRegion]
