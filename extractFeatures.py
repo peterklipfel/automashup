@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import sys
 import echonest.remix.audio as audio
+from pyechonest import config
+config.CALL_TIMEOUT=30
 
 # Usage:
 #
@@ -17,16 +19,20 @@ import echonest.remix.audio as audio
 #
 # Make a file (in curr directory) for each region type, and stuff in as csv
 
-def writeFeaturesToFile( fn, file, Q ):
+def writeFeaturesToFile( fn, songId, file, Q ):
     fmtStr = ',%.6f'
     for i,q in enumerate(Q):
         # file name
         file.write( '"%s"' % (fn) )
+        # file id
+        file.write( ',%s' % songId )
         # quantum number
         file.write( ',%s' % i )
         # confidence - sometimes missing... for sections?
         if q.confidence != None:
             file.write( fmtStr % q.confidence )
+        else:
+            file.write( ',' )
         # duration
         file.write( fmtStr % q.duration )
         # loudness
@@ -52,10 +58,12 @@ for fn in sys.argv[1:]:
     print 'Processing file %s...' % fn
     au = audio.LocalAudioFile(fn)
     # Write out the analysis data from each of the region types, for all regions
-    writeFeaturesToFile( fn, files[regionTypes.index('bars')], au.analysis.bars )
-    writeFeaturesToFile( fn, files[regionTypes.index('beats')], au.analysis.beats )
-    writeFeaturesToFile( fn, files[regionTypes.index('sections')], au.analysis.sections )
-    writeFeaturesToFile( fn, files[regionTypes.index('tatums')], au.analysis.tatums )
+    id = str(au.analysis.identifier)
+    #print 'nb bars = ', len(au.analysis.bars)
+    writeFeaturesToFile( fn, id, files[regionTypes.index('bars')], au.analysis.bars )
+    writeFeaturesToFile( fn, id, files[regionTypes.index('beats')], au.analysis.beats )
+    writeFeaturesToFile( fn, id, files[regionTypes.index('sections')],au.analysis.sections )
+    writeFeaturesToFile( fn, id, files[regionTypes.index('tatums')], au.analysis.tatums )
 
 # close dem files
 for f in files:
