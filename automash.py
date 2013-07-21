@@ -113,7 +113,7 @@ print 'INITIALIZING...'
 # cluster.
 
 # current section cluster
-clSection = np.random.choice( range( clsec.nbClusters() ) )  
+clSection = np.random.randint( 0, clsec.nbClusters() )  
 # current section, integer index into ALL regions of this type
 currSec = clsec.nextRegion( clSection, None )
 getSongFromCache( clsec.getFilenameOfRegion(currSec), True )
@@ -121,7 +121,9 @@ getSongFromCache( clsec.getFilenameOfRegion(currSec), True )
 # keep doing this check every time these vars change, for consistency.
 docheck( clsec, clSection, currSec )
 
-print 'MASHING...'
+# Don't play for this many iterations, to warm it up.
+warmUpCounter = np.round(maxCacheSize/2)
+
 while True:
     # single cluster loop:
     for i in range( nsame ):
@@ -135,8 +137,13 @@ while True:
             csong = getSongFromCache(currFn)
             # must be in the cache
             assert csong != None
-            playRegion( csong.m_adata, 'sections', \
-                            clsec.getSongRegionIdx(currSec) )
+            if warmUpCounter > 0:
+                warmUpCounter -= 1
+                if warmUpCounter == 0:
+                    print 'MASHING...'
+            else:
+                playRegion( csong.m_adata, 'sections', \
+                                clsec.getSongRegionIdx(currSec) )
         # todo: keep a history and don't go back too early?
         # todo: pick same key?
 

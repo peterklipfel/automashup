@@ -176,7 +176,7 @@ class ClusterInfo:
             return cands[0]
         elif currRegion == None:
             # This is code for 'no start point', initialise
-            return np.random.choice( cands )
+            return cands[ np.random.randint( 0, len(cands) ) ]
         else:
             # pick one that isn't this one
             return np.random.choice( np.setdiff1d( cands, [currRegion] ) )
