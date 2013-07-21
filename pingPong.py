@@ -4,7 +4,11 @@
 #   ./pingPong.py audio/illgates_sweatshop.mp3 audio/jayz_youngforever.mp3 test2.mp3
 import sys
 import time
+import random
 import echonest.remix.audio as audio
+
+from pyechonest import config
+config.CALL_TIMEOUT=30
 
 def swap(a,b):
     return b,a
@@ -26,8 +30,8 @@ audio_file2 = audio.LocalAudioFile(sys.argv[2])
 #audio_file2 = audio.LocalAudioFile('../songs/MordFustang-LickTheRainbow.mp3')#sys.argv[2])
 
 # Analyse songs on soundcloud to segment.
-beats1 = audio_file1.analysis.bars
-beats2 = audio_file2.analysis.bars
+beats1 = audio_file1.analysis.beats
+beats2 = audio_file2.analysis.beats
 
 # Swap so file 1 is the longest
 if len(beats1) < len(beats2):
@@ -42,12 +46,30 @@ nb = len(beats2)
 # make a list of audio segments
 alist = []
 i=0 # beat index
+
+interesting_segments = []
+for d in audio_file1.analysis.segments:
+  if d.duration > 0.5:
+    if len(audio_file1[ d ]) > 0 and len(audio_file2[ beats2[i]]) > 0:
+      interesting_segments.append( audio_file1[ d ])
+
 while i < nb:
     print 'Beat pair %d of %d' % (i,nb)
     # add next beat from song 1
-    alist.append( audio_file1[ beats1[i] ] )
+    # alist.append( audio_file2[ beats2[i] ] )
     # add next beat from song 2
-    alist.append( audio_file2[ beats2[i] ] )
+    # if audio_file2.analysis.bars[i].confidence > 0.15:
+    #   minlen = min(audio_file1.data.shape[0], audio_file2.data.shape[0])
+    #   # audiofile = audio_file2
+    #   # audiofile.data = audiofile.data[:minlen,:] + audio_file1.data[:minlen,:]
+
+    if random.randrange(100) < 70:
+      alist.append( audio.mix(audio_file2[ beats2[i] ], interesting_segments[random.randrange(len(interesting_segments))] ) )
+    else:
+      alist.append(audio_file2[beats2[i]])
+
+    # else:
+      # alist.append( audio_file1[ beats1[i] ] )
     i += 1
 
 # construct output waveform from these audiodata objects.
