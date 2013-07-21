@@ -93,12 +93,35 @@ def docheck( clsec, clSection, currSec ):
     assert currSec in range( clsec.nbRegions() ), 'currSec=%d out of range [0,%d)' % (currSec, clsec.nbRegions())
 
 
-# this loads a dict from rtype to clinfo
+def addBarsToAudio( clInfo, sectionSongData, sectionParentQnt ):
+    # secAData is section audio data
+    # for each bar in this section:
+    
+    mixedBars = []
+    for barDestQnt in sectionParentQnt.children():
+        # Get the data for the destination
+        barDestAData = sectionSongData[ barDestQnt ]
+        #   pick a bar to add
+        barSong = None
+        while barSong == None:
+            barIdxCI = np.random.randint(250,300)#clInfo['bars'].nbRegions())
+            fnSrc = clInfo['bars'].getFilenameOfRegion( barIdxCI )
+            barSong = getSongFromCache( fnSrc, True )
+        barSong = barSong.m_adata
+        barSrcIdxIntoSong = clInfo['bars'].getSongRegionIdx( barIdxCI )
+        barSrcQnt = barSong.analysis.bars[ barSrcIdxIntoSong ]
+        barSrcAData = barSong[ barSrcQnt ]
+        #   mix the bar into the section
+        mixedBars.append( audio.mix( barDestAData, barSrcAData ) )
+    # return the result
+    return audio.assemble( mixedBars )
+
+# this loads a dict from rtype to clInfo
 f = open(sys.argv[1],'rb');
-clinfo = pickle.load(f)
+clInfo = pickle.load(f)
 f.close()
 # makes code briefer
-clsec = clinfo['sections']
+clsec = clInfo['sections']
 
 # Some technical issues:
 #  - can't fit all songs into RAM
@@ -149,9 +172,10 @@ while True:
                 rgnIdx = clsec.getSongRegionIdx(currSec) # an int
                 allSectionsForSong = cluster.getRegionsOfType( \
                     csong.m_adata.analysis, 'sections' ) # array of quanta
-                secAData = csong.m_adata[ allSectionsForSong[rgnIdx] ]
-                addBarsToAudio( sedAData, ... )
-                addBeatsToAudio( sedAData, ... )
+                #secAData = csong.m_adata[ allSectionsForSong[rgnIdx] ]
+                secAData = addBarsToAudio( clInfo, csong.m_adata, \
+                                               allSectionsForSong[rgnIdx] )
+                #addBeatsToAudio( sedAData, ... )
                 playAudioData( secAData )
         # todo: keep a history and don't go back too early?
         # todo: pick same key?
