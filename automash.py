@@ -7,6 +7,7 @@ import echonest.remix.audio as audio
 from pyechonest import config
 config.CALL_TIMEOUT=30
 import threading
+import os
 
 # This is the demo script.
 # Feed it a pre-computed pickle file from analyseFeatures.py.  Make sure
@@ -25,7 +26,7 @@ class CachedSong:
         self.m_fn = fn
         self.m_birthTime = cacheTime
         print 'Song Cache: loading song %s...' % fn
-        self.m_adata = None#!!audio.LocalAudioFile(fn)
+        self.m_adata = audio.LocalAudioFile(fn)
 
 class CacheSongThread(threading.Thread):
     def __init__(self,fn):
@@ -77,9 +78,11 @@ def getSongFromCache( fn, loadBlocking=False ):
 
 def playRegion( adata, rtype, rgnIdx ):
     # Get this region quantum
-    #!!q = cluster.getRegionsOfType( adata.analysis, rtype )[rgnIdx]
+    q = cluster.getRegionsOfType( adata.analysis, rtype )[rgnIdx]
     # Don't know what to do right now.  Write to wav file and do a system call.
-    pass
+    aout = adata[ q ]
+    aout.encode('/tmp/noplay.wav')
+    os.system( 'aplay /tmp/noplay.wav' )
 
 def docheck( clsec, clSection, currSec ):
     assert clSection in range( clsec.nbClusters() ), 'clSection=%d out of range [0,%d)' % (clSection,clsec.nbClusters())
@@ -102,8 +105,8 @@ clsec = clinfo['sections']
 #  - every time it tries to change and can't because file isn't there, start
 #    loading it.
 
-nsame = 5
-nrep  = 3
+nsame = 2
+nrep  = 1
 
 print 'INITIALIZING...'
 # The main tune is the 'sections' of the songs.  Randomly pick an initial

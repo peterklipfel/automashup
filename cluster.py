@@ -174,9 +174,13 @@ class ClusterInfo:
         if len(cands) == 1:
             # only one to choose from
             return cands[0]
+        elif currRegion == None:
+            # This is code for 'no start point', initialise
+            return np.random.choice( cands )
         else:
             # pick one that isn't this one
             return np.random.choice( np.setdiff1d( cands, [currRegion] ) )
+
 
     def nextCluster( self, currCluster ):
         # Move on to a similar cluster, but with randomness.  So, randomly
