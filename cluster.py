@@ -179,7 +179,8 @@ class ClusterInfo:
             return cands[ np.random.randint( 0, len(cands) ) ]
         else:
             # pick one that isn't this one
-            return np.random.choice( np.setdiff1d( cands, [currRegion] ) )
+            cands = np.setdiff1d( cands, [currRegion] )
+            return cands[ np.random.randint(0,len(cands)) ]
 
 
     def nextCluster( self, currCluster ):
