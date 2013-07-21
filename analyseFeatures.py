@@ -15,14 +15,14 @@ import cluster
 
 # in the end we want to store: analysis data (beats etc), then a cluster info
 # for each region type
-clinfoAll = []
+clinfoAll = {} # dict from rtype to clinfo
 
 for rtype in cluster.regionTypes:
     # Construct the matrix of features on which we are going to cluster for each
     # of the region types.
     # Perform clustering
     print 'Analysing ',rtype
-    clinfoAll.append( cluster.ClusterInfo( rtype, sys.argv[1:] ) )
+    clinfoAll[rtype] = cluster.ClusterInfo( rtype, sys.argv[1:] )
 
 # Pickle all those results
 f = open( 'clusterInfo.pkl', 'wb')

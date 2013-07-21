@@ -10,6 +10,17 @@ ftrDim = 12+12+2
 
 regionTypes = [ 'bars', 'beats', 'sections', 'tatums' ]
 
+def weighted_pick(weights,n_picks):
+    """
+    Weighted random selection
+    returns n_picks random indexes.
+    the chance to pick the index i 
+    is give by the weight weights[i].
+    """
+    t = np.cumsum(weights)
+    s = np.sum(weights)
+    return np.searchsorted(t,np.random.rand(n_picks)*s)
+
 def getRegionsOfType( analysis, rtype ):
     if rtype == 'bars':
         return analysis.bars
@@ -35,9 +46,11 @@ def computeFeatureVector( aregion ):
 
 def createFeatureMatrixSongs( rtype, songFns ):
     D = None
+    segFns = []
     for fn in songFns:
         au = audio.LocalAudioFile(fn)
         regs = getRegionsOfType( au.analysis, rtype )
+        segFns += [fn for kk in regs]
         if dbg:
             print '\tClustering %d %s regions for this song' % (len(regs),rtype)
         if D==None:
@@ -46,7 +59,8 @@ def createFeatureMatrixSongs( rtype, songFns ):
             D = np.vstack( [D, createFeatureMatrix(regs)] )
         if dbg:
             print '\tFeature matrix has grown to size ', D.shape
-    return D
+    assert len(segFns) == D.shape[0]
+    return (D, segFns)
 
 def createFeatureMatrix( aregionList ):
     n = len(aregionList)
@@ -122,7 +136,8 @@ class ClusterInfo:
     def __init__(self, rtype, songFileList):
         self.m_rtype = rtype
         # n x D matrix
-        X = createFeatureMatrixSongs( rtype, songFileList )
+        (X,self.m_songFns) = createFeatureMatrixSongs( rtype, songFileList )
+
         if dbg:
             print 'Size of full feature matrix = ', X.shape
 
@@ -136,3 +151,30 @@ class ClusterInfo:
 
         if dbg:
             plt.waitforbuttonpress()
+
+
+    def nbClusters( self ):
+        return self.m_clusterCentres.shape[0]
+
+    def sizeOfCluster( self, clid ):
+        return np.count_nonzero( self.m_clusterIds == clid )
+
+    def nextRegion( self, currCluster, currRegion ):
+        # Randomly pick one that ain't this one.
+        # Get regions of this cluster.
+        cands = np.nonzero( self.m_clusterIds == currCluster )[0]
+        assert len(cands) > 0
+        if len(cands) == 1:
+            # only one to choose from
+            return cands[0]
+        else:
+            # pick one that isn't this one
+            return np.random.choice( np.setdiff1d( cands, [currRegion] ) )
+
+    def nextCluster( self, currCluster ):
+        # Move on to a similar cluster, but with randomness.  So, randomly
+        # pick proportional to probability.
+        res = currCluster
+        while self.nbClusters()>1 and res == currCluster:
+            res = weighted_pick( self.m_clusterTransProbs[currCluster,:], 1 )
+        return res
