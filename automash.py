@@ -165,7 +165,7 @@ def addBarsToAudio( clInfo, sectionSongData, sectionParentQnt, indexBars ):
         barSrcAData = barSong[ barSrcQnt ]
         #   mix the bar into the section
         unmixedBars.append( barSrcAData )
-        print '\t\ti=',i,', indexBars=', indexBars
+        #print '\t\ti=',i,', indexBars=', indexBars
     # return the result
     return ( audio.assemble( unmixedBars ), indexBars )
 
@@ -186,7 +186,7 @@ clsec = clInfo['sections']
 #    loading it.
 
 nsame = 2
-nrep  = 1
+nrep  = 2
 
 print 'INITIALIZING...'
 # The main tune is the 'sections' of the songs.  Randomly pick an initial
@@ -225,15 +225,24 @@ while True:
                 if warmUpCounter == 0:
                     print 'MASHING...'
             else:
+                # a) get the section audio
                 rgnIdx = clsec.getSongRegionIdx(currSec) # an int
                 allSectionsForSong = cluster.getRegionsOfType( \
                     csong.m_adata.analysis, 'sections' ) # array of quanta
-                (secAData, indexBars) = addBarsToAudio( \
+                secAData = csong.m_adata[allSectionsForSong[rgnIdx]]
+                # b) get the beat concat audio and merge
+                (beatAData, indexBars) = addBarsToAudio( \
                     clInfo, csong.m_adata, allSectionsForSong[rgnIdx], \
                         indexBars )
+
+                # Let's not always mix, it can sound messy
+                if np.random.random() < 0.25:
+                    secnResult = audio.mix( secAData, beatAData )
+                else:
+                    secnResult = beatAData
                 #secAData = addBeatsToAudio( clInfo, csong.m_adata, \
                 #                                allSectionsForSong[rgnIdx] )
-                playAudioData( secAData )
+                playAudioData( secnResult )
         # todo: keep a history and don't go back too early?
         # todo: pick same key?
 
