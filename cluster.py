@@ -5,7 +5,7 @@ import echonest.remix.audio as audio
 import scipy
 import matplotlib.pyplot as plt
 
-dbg = 1
+dbg = 0
 ftrDim = 12+12+2
 
 regionTypes = [ 'bars', 'beats', 'sections', 'tatums' ]
