@@ -6,6 +6,8 @@ import sys
 import time
 import random
 import echonest.remix.audio as audio
+import pyglet
+import numpy as np
 
 from pyechonest import config
 config.CALL_TIMEOUT=30
@@ -19,7 +21,7 @@ start_time = time.time()
 #
 #   pingPong.py <song1.mp3> <song2.mp3> <outfile.mp3> 
 #
-assert len(sys.argv) == 4, "Incorrect usage.\n\tpingPong.py <song1.mp3> <song2.mp3> <outfile.mp3>"
+assert len(sys.argv) == 3, "Incorrect usage.\n\tpingPong.py <song1.mp3> <song2.mp3>"
 
 # This test script takes two songs as input and creates one output song with
 # alternating bars from the 2 songs.  Output written to mp3 file.
@@ -76,6 +78,12 @@ while i < nb:
 afout = audio.assemble( alist )
 
 # Write output file
-afout.encode( sys.argv[3] )
+filename = "play"+str(int(time.time()))+".mp3"
+
+afout.encode( filename )
+
+music = pyglet.media.load(filename)
+
+music.play()
 
 print "pingPong execution time: ", time.time() - start_time, " seconds"
