@@ -7,12 +7,19 @@
 regionTypes = { 'bars', 'beats', 'sections', 'tatums' };
 
 % Load the data.
-for t = 1 % 1:length(regionTypes)
+for t = 1:length(regionTypes)
     fprintf('Analysing %s...\n', regionTypes{t} );
     % Read this data
     ifn = sprintf('songftrs_%s.csv', regionTypes{t});
-    [ftrFns, X, varNames] = readFtrsFile( ifn );
+    [ftrFns, ftrIds, X, varNames] = readFtrsFile( ifn );
     fnum=1;
+    n = size(X,1);
+    fprintf('\tThere are %d samples\n',n);
+    
+    % It's better for clustering and plotting to take the log of the chroma
+    % features
+    sel = 5:16;
+    X(:,sel) = log10(max(1e-3,X(:,sel)));
     
     idxConf = strmatch('confidence',varNames);
     idxDurn = strmatch('duration',varNames);
@@ -49,7 +56,35 @@ for t = 1 % 1:length(regionTypes)
     gplotmatrix( X(:,idxTimb) );
     title(sprintf('%s: timbre',regionTypes{t}));
     
+    if 0
+    % Cluster these agglomerative
+    D = pdist( X(:,3:end) ); % mode around 15
+    figure(fnum); clf; fnum=fnum+1;
+    myim(squareform(D));
+    title(sprintf('%s: distance matrix',regionTypes{t}));
+    Z = linkage(D);
+    %figure(fnum); clf; fnum=fnum+1;
+    %dendrogram(Z);
+    %title(sprintf('%s: dendrogram',regionTypes{t}));
+    distThresh = 15.0;
+    %T = cluster(Z,'cutoff',distThresh,'criterion','distance');
+    T = cluster(Z,'maxclust', 15 );
+    else
+        nbClusters = floor(sqrt(n/2));
+        [T,clc] = kmeans( X(:,3:end), nbClusters );
+    end
+    fprintf('\tNumber of clusters = %d\n', length(unique(T)));
+
+    figure(fnum); clf; fnum=fnum+1;
+    gplotmatrix( X(:,1:16), X(:,17:end), T );
+    title(sprintf('%s: ftr grid',regionTypes{t}));
+
+    figure(fnum); clf; fnum=fnum+1;
+    scatter3( X(:,4), std(X(:,5:16),0,2), X(:,18), 5, T ); 
+    grid on;
+    title(sprintf('%s: clusters',regionTypes{t}));
+    
     drawnow;
-    %pause;
+    pause;
 end
 

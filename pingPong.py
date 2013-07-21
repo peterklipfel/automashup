@@ -25,7 +25,7 @@ audio_file2 = audio.LocalAudioFile(sys.argv[2])
 #audio_file1 = audio.LocalAudioFile('../songs/02-far_too_loud-megaloud-alki.mp3')#sys.argv[1])
 #audio_file2 = audio.LocalAudioFile('../songs/MordFustang-LickTheRainbow.mp3')#sys.argv[2])
 
-# Analyse songs on soundcloud to segment.
+# Analyse songs on echo nest to segment.
 beats1 = audio_file1.analysis.bars
 beats2 = audio_file2.analysis.bars
 
@@ -44,10 +44,13 @@ alist = []
 i=0 # beat index
 while i < nb:
     print 'Beat pair %d of %d' % (i,nb)
-    # add next beat from song 1
-    alist.append( audio_file1[ beats1[i] ] )
-    # add next beat from song 2
-    alist.append( audio_file2[ beats2[i] ] )
+    if i%2 == 0:
+        # add next beat from song 1
+        alist.append( audio_file1[ beats1[i] ] )
+        # add next beat from song 2
+        # alist.append( audio_file2[ beats2[i] ] )
+    else:
+        alist.append( audio.mix( audio_file1[ beats1[i] ],audio_file2[ beats2[i] ] ) )
     i += 1
 
 # construct output waveform from these audiodata objects.
