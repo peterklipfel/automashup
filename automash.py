@@ -8,6 +8,8 @@ from pyechonest import config
 config.CALL_TIMEOUT=30
 import threading
 import os
+import alsaaudio
+import time
 
 # This is the demo script.
 # Feed it a pre-computed pickle file from analyseFeatures.py.  Make sure
@@ -19,6 +21,21 @@ maxCacheSize = 15   # HM can we have in RAM at once
 cacheTime = 0
 # A dictionary from filename to CachedSong
 songCache = {}
+
+card = 'default'
+
+# Open the device in playback mode.
+out = alsaaudio.PCM(alsaaudio.PCM_PLAYBACK, card=card)
+
+# Set attributes: Mono, 44100 Hz, 16 bit little endian frames
+out.setchannels(2)
+out.setrate(44100)
+out.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+
+# The period size controls the internal number of frames per period.
+# The significance of this parameter is documented in the ALSA api.
+out.setperiodsize(160)
+
 
 class CachedSong:
     def __init__(self,fn):
@@ -85,8 +102,14 @@ def playRegion( adata, rtype, rgnIdx ):
     os.system( 'aplay /tmp/noplay.wav' )
 
 def playAudioData( adata ):
-    adata.encode('/tmp/noplay.wav')
-    os.system( 'aplay /tmp/noplay.wav' )
+    filepath = "/tmp/noplay"+str(int(time.time()))+".wav"
+    adata.encode(filepath)
+    f = open(filepath)
+    data = f.read(320)
+    while data:
+        out.write(data)
+        data = f.read(320)
+    # os.system( 'aplay /tmp/noplay.wav' )
 
 def docheck( clsec, clSection, currSec ):
     assert clSection in range( clsec.nbClusters() ), 'clSection=%d out of range [0,%d)' % (clSection,clsec.nbClusters())
