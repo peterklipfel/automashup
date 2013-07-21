@@ -93,31 +93,61 @@ def docheck( clsec, clSection, currSec ):
     assert currSec in range( clsec.nbRegions() ), 'currSec=%d out of range [0,%d)' % (currSec, clsec.nbRegions())
 
 
-def addBarsToAudio( clInfo, sectionSongData, sectionParentQnt ):
+def addBarsToAudio( clInfo, sectionSongData, sectionParentQnt, indexBars ):
+    # The strategy for bars logic is:
+    #  + if it comes in empty, initialise it.
+    #  + pick some number of bars (eg 2, or random small) to use as a pool
+    #  + cycle through them including the first bar of of the next section.
+    #    So you reset on the second bar of each section.
+    #  + to reset, change clusters with some prob, and randomly pick bars from
+    #    the cluster.
+
     # secAData is section audio data
     # for each bar in this section:
-    
-    mixedBars = []
-    for barDestQnt in sectionParentQnt.children():
-        # Get the data for the destination
-        barDestAData = sectionSongData[ barDestQnt ]
-        #   pick a bar to add
-        barSong = None
-        while barSong == None:
-            barIdxCI = np.random.randint(250,300)#clInfo['bars'].nbRegions())
-            fnSrc = clInfo['bars'].getFilenameOfRegion( barIdxCI )
-            barSong = getSongFromCache( fnSrc, True )
+    unmixedBars = []
+    print '\taddBarsToAudio: section has %d children:' % len(sectionParentQnt.children())
+    for i, barDestQnt in enumerate(sectionParentQnt.children()):
+        # first, potentially update our pool bars
+        # add the bar after the selected one
+        if indexBars == None or i==1:
+            # move along.  list of cluster idx, bar idx's
+            barSongs = [None,None,None,None]
+            if indexBars == None:
+                indexBars = [None,None,None,None,None]
+            while None in barSongs:
+                # advance the cluster
+                newIndexBars = [clInfo['bars'].nextCluster( indexBars[0] ), None, None, None, None ]
+                for j in range(1,len(indexBars)):
+                    # for each pool...
+                    if j==2 or j==4:
+                        newIndexBars[j] = min(newIndexBars[j-1]+1,clInfo['bars'].nbRegions()-1) # continuity!
+                    else:
+                        newIndexBars[j] = clInfo['bars'].nextRegion(newIndexBars[0],\
+                                                                        indexBars[j] )
+                    # try loading the data
+                    barSongs[j-1] = getSongFromCache( clInfo['bars'].getFilenameOfRegion(\
+                            newIndexBars[j] ) )
+            # update the var
+            indexBars = newIndexBars
+        # assertion: these bars cannot give no data
+        # use this info to get the bars we want, alternate.
+        npool = len(indexBars)-1
+        poolIdx = i%npool
+        fnSrc = clInfo['bars'].getFilenameOfRegion( indexBars[1+poolIdx] )
+        barSong = getSongFromCache( fnSrc )
+        assert barSong != None
         barSong = barSong.m_adata
-        barSrcIdxIntoSong = clInfo['bars'].getSongRegionIdx( barIdxCI )
+        barSrcIdxIntoSong = clInfo['bars'].getSongRegionIdx( indexBars[1+poolIdx] )
         barSrcQnt = barSong.analysis.bars[ barSrcIdxIntoSong ]
         barSrcAData = barSong[ barSrcQnt ]
         #   mix the bar into the section
-        mixedBars.append( audio.mix( barDestAData, barSrcAData ) )
+        unmixedBars.append( barSrcAData )
+        print '\t\ti=',i,', indexBars=', indexBars
     # return the result
-    return audio.assemble( mixedBars )
+    return ( audio.assemble( unmixedBars ), indexBars )
 
 # this loads a dict from rtype to clInfo
-f = open(sys.argv[1],'rb');
+f = open(sys.argv[1],'rb')
 clInfo = pickle.load(f)
 f.close()
 # makes code briefer
@@ -140,10 +170,13 @@ print 'INITIALIZING...'
 # cluster.
 
 # current section cluster
-clSection = np.random.randint( 0, clsec.nbClusters() )  
+clSection = clsec.nextCluster( None )
 # current section, integer index into ALL regions of this type
 currSec = clsec.nextRegion( clSection, None )
 getSongFromCache( clsec.getFilenameOfRegion(currSec), True )
+
+# This is the cluster/bar index for bars
+indexBars = None
 
 # keep doing this check every time these vars change, for consistency.
 docheck( clsec, clSection, currSec )
@@ -172,10 +205,11 @@ while True:
                 rgnIdx = clsec.getSongRegionIdx(currSec) # an int
                 allSectionsForSong = cluster.getRegionsOfType( \
                     csong.m_adata.analysis, 'sections' ) # array of quanta
-                #secAData = csong.m_adata[ allSectionsForSong[rgnIdx] ]
-                secAData = addBarsToAudio( clInfo, csong.m_adata, \
-                                               allSectionsForSong[rgnIdx] )
-                #addBeatsToAudio( sedAData, ... )
+                (secAData, indexBars) = addBarsToAudio( \
+                    clInfo, csong.m_adata, allSectionsForSong[rgnIdx], \
+                        indexBars )
+                #secAData = addBeatsToAudio( clInfo, csong.m_adata, \
+                #                                allSectionsForSong[rgnIdx] )
                 playAudioData( secAData )
         # todo: keep a history and don't go back too early?
         # todo: pick same key?

@@ -184,12 +184,15 @@ class ClusterInfo:
 
 
     def nextCluster( self, currCluster ):
-        # Move on to a similar cluster, but with randomness.  So, randomly
-        # pick proportional to probability.
-        res = currCluster
-        while self.nbClusters()>1 and res == currCluster:
-            res = weighted_pick( self.m_clusterTransProbs[currCluster,:], 1 )
-        return res
+        if currCluster == None:
+            return np.random.randint( 0, self.nbClusters() )  
+        else:
+            # Move on to a similar cluster, but with randomness.  So, randomly
+            # pick proportional to probability.
+            res = currCluster
+            while self.nbClusters()>1 and res == currCluster:
+                res = weighted_pick( self.m_clusterTransProbs[currCluster,:], 1 )[0]
+            return res
 
     def getFilenameOfRegion( self, rgnIdx ):
         return self.m_songFns[rgnIdx]
