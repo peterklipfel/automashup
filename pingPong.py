@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+# eg:
+#   ./pingPong.py audio/illgates_sweatshop.mp3 audio/jayz_youngforever.mp3 test2.mp3
 import sys
 import time
 import echonest.remix.audio as audio
@@ -10,7 +13,7 @@ start_time = time.time()
 
 # Usage:
 #
-#   pingPong.py <song1.mp3> <song2.mp3> <outfile.mp3>
+#   pingPong.py <song1.mp3> <song2.mp3> <outfile.mp3> 
 #
 assert len(sys.argv) == 4, "Incorrect usage.\n\tpingPong.py <song1.mp3> <song2.mp3> <outfile.mp3>"
 
@@ -23,8 +26,8 @@ audio_file2 = audio.LocalAudioFile(sys.argv[2])
 #audio_file2 = audio.LocalAudioFile('../songs/MordFustang-LickTheRainbow.mp3')#sys.argv[2])
 
 # Analyse songs on soundcloud to segment.
-beats1 = audio_file1.analysis.beats
-beats2 = audio_file2.analysis.beats
+beats1 = audio_file1.analysis.bars
+beats2 = audio_file2.analysis.bars
 
 # Swap so file 1 is the longest
 if len(beats1) < len(beats2):
@@ -33,25 +36,18 @@ if len(beats1) < len(beats2):
 
 assert len(beats1) >= len(beats2)
 
-# Start output with first segment of beats1
-#afout = audio_file1[ beats1[0] ]
-#afout = audio.AudioData( shape=(audio_file1.data.shape[0]+audio_file2.data.shape[1],2), sampleRate=audio_file1.sampleRate, \
-#                            numChannels=audio_file1.numChannels)
-
 # Construct alternating segments result. Don't use last beat in case same len
 nb = len(beats2)
-# use this for quick result
-#nb = 100
 
-i = 1
 # make a list of audio segments
 alist = []
-for b1,b2 in zip( beats1[:nb], beats2[:nb] ):
-    print 'Beat pair %d of %d: %s, %s' % (i,nb, str(b1), str(b2))
-    # add next beat from song 2
-    alist.append( audio_file2[b2] )
+i=0 # beat index
+while i < nb:
+    print 'Beat pair %d of %d' % (i,nb)
     # add next beat from song 1
-    alist.append( audio_file1[b1] )
+    alist.append( audio_file1[ beats1[i] ] )
+    # add next beat from song 2
+    alist.append( audio_file2[ beats2[i] ] )
     i += 1
 
 # construct output waveform from these audiodata objects.
