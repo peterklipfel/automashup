@@ -1,38 +1,21 @@
-// Remix.js
-// Thor Kell & Paul Lamere, 12/2012
-// Based on Paul Lamere's Infinite Jukebox and assorted other javascript projects
 
 function createJRemixer(context, jquery, apiKey) {
     var $ = jquery;
-    $.ajaxSetup({ cache: false });
 
     var remixer = {
-        remixTrackById: function(trackID, trackURL, callback) {
-            var track;
-            var url = 'http://developer.echonest.com/api/v4/track/profile?format=json&bucket=audio_summary'
-            $.getJSON(url, {id:trackID, api_key:apiKey}, function(data) {
-                var analysisURL = data.response.track.audio_summary.analysis_url;
-                track = data.response.track;
-                
-                // This call is proxied through the yahoo query engine.  
-                // This is temporary, but works.
-                $.getJSON("http://query.yahooapis.com/v1/public/yql", 
-                    { q: "select * from json where url=\"" + analysisURL + "\"", format: "json"}, 
-                    function(data) {
-                        if (data.query.results != null) {
-                            track.analysis = data.query.results.json;
-                            remixer.remixTrack(track, trackURL, callback);   
-                        }
-                        else {
-                            callback(track, "Error:  no analysis data returned for that track - 0 ");  
-                            console.log('error', 'No analysis data returned:  try again, or try another trackID');
-                        }
-                });
 
+        remixTrackById: function(id, url, callback) {
+            var url = 'http://labs.echonest.com/Uploader/profile?callback=?'
+            $.getJSON(url, { id:id, api_key:apiKey }, function(data) {
+                console.log(data)
+                if (data.response.status.code == 0) {
+                    remixer.remixTrack(data.response.track, url, callback)
+                }
             });
         },
 
-        remixTrack : function(track, trackURL, callback) {
+        remixTrack : function(track, trackurl, callback) {
+
             function fetchAudio(url) {
                 var request = new XMLHttpRequest();
                 trace("fetchAudio " + url);
@@ -46,27 +29,32 @@ function createJRemixer(context, jquery, apiKey) {
                      if (false) {
                         track.buffer = context.createBuffer(request.response, false);
                         track.status = 'ok'
+                        callback(1, track, 100);
                     } else {
                         context.decodeAudioData(request.response, 
                             function(buffer) {      // completed function
                                 track.buffer = buffer;
-                                track.status = 'ok';
-                                callback(track, 100);   
+                                track.status = 'ok'
+                                callback(1, track, 100);
                             }, 
                             function(e) { // error function
                                 track.status = 'error: loading audio'
+                                callback(-1, track, 0);
                                 console.log('audio error', e);
                             }
                         );
                     }
                 }
+
                 request.onerror = function(e) {
                     trace('error loading loaded');
                     track.status = 'error: loading audio'
+                    callback(-1, track, 0);
                 }
+
                 request.onprogress = function(e) {
                     var percent = Math.round(e.position * 100  / e.totalSize);
-                    callback(track, percent);   
+                    callback(0, track, percent);
                 }
                 request.send();
             }
@@ -75,6 +63,7 @@ function createJRemixer(context, jquery, apiKey) {
                 trace('preprocessTrack');
                 var types = ['sections', 'bars', 'beats', 'tatums', 'segments'];
 
+                
                 for (var i in types) {
                     var type = types[i];
                     trace('preprocessTrack ' + type);
@@ -112,6 +101,7 @@ function createJRemixer(context, jquery, apiKey) {
                 connectAllOverlappingSegments(track, 'bars');
                 connectAllOverlappingSegments(track, 'beats');
                 connectAllOverlappingSegments(track, 'tatums');
+
 
                 filterSegments(track);
             }
@@ -194,11 +184,11 @@ function createJRemixer(context, jquery, apiKey) {
                     for (var j = last; j < segs.length; j++) {
                         var qseg = segs[j];
                         // seg starts before quantum so no
-                        if (parseFloat(qseg.start) + parseFloat(qseg.duration) < parseFloat(q.start)) {
+                        if ((qseg.start + qseg.duration) < q.start) {
                             continue;
                         }
                         // seg starts after quantum so no
-                        if (parseFloat(qseg.start) > parseFloat(q.start) + parseFloat(q.duration)) {
+                        if (qseg.start > (q.start + q.duration)) {
                             break;
                         }
                         last = j;
@@ -210,9 +200,10 @@ function createJRemixer(context, jquery, apiKey) {
 
             if (track.status == 'complete') {
                 preprocessTrack(track);
-                fetchAudio(trackURL);
+                fetchAudio(trackurl);
             } else {
                 track.status = 'error: incomplete analysis';
+                callback(false, track);
             }
         },
 
@@ -220,74 +211,62 @@ function createJRemixer(context, jquery, apiKey) {
             var queueTime = 0;
             var audioGain = context.createGainNode();
             var curAudioSource = null;
-            var currentlyQueued = new Array();
             var curQ = null;
-            var onPlayCallback = null;
-            var afterPlayCallback = null;
-            var currentTriggers = new Array();
+            var speedFactor = 1.00;
             audioGain.gain.value = 1;
             audioGain.connect(context.destination);
 
             function queuePlay(when, q) {
+                // console.log('qp', when, q);
                 audioGain.gain.value = 1;
                 if (isAudioBuffer(q)) {
                     var audioSource = context.createBufferSource();
                     audioSource.buffer = q;
                     audioSource.connect(audioGain);
-                    currentlyQueued.push(audioSource);
                     audioSource.noteOn(when);
-                    if (onPlayCallback != null) {
-                        theTime = (when - context.currentTime) *  1000;
-                        currentTriggers.push(setTimeout(onPlayCallback, theTime));
-                    }
-                    if (afterPlayCallback != null) {
-                        theTime = (when - context.currentTime + parseFloat(q.duration)) *  1000;
-                        currentTriggers.push(setTimeout(afterPlayCallback, theTime));
-                    }
-                    return when + parseFloat(q.duration);
+                    return when;
                 } else if ($.isArray(q)) {
-                    // Correct for load times
-                    if (when == 0) {
-                        when = context.currentTime;
-                    }
-                    for (var i = 0; i < q.length; i++) {
+                    for (var i in q) {
                         when = queuePlay(when, q[i]);
                     }
                     return when;
                 } else if (isQuantum(q)) {
                     var audioSource = context.createBufferSource();
+                    var duration = q.duration;
                     audioSource.buffer = q.track.buffer;
                     audioSource.connect(audioGain);
+                    audioSource.noteGrainOn(when, q.start, duration);
                     q.audioSource = audioSource;
-                    currentlyQueued.push(audioSource);
-                    audioSource.noteGrainOn(when, q.start, q.duration);
-
-                    // I need to clean up all these ifs
-                    if ("syncBuffer" in q) {
-                        var audioSource = context.createBufferSource();
-                        audioSource.buffer = q.syncBuffer;
-                        audioSource.connect(audioGain);
-                        currentlyQueued.push(audioSource);
-                        audioSource.noteOn(when);
-                    }
-
-                    if (onPlayCallback != null) {
-                        theTime = (when - context.currentTime) *  1000;
-                        currentTriggers.push(setTimeout(onPlayCallback, theTime));
-                    }
-                    if (afterPlayCallback != null) {
-                        theTime = (when - context.currentTime + parseFloat(q.duration)) *  1000;
-                        currentTriggers.push(setTimeout(afterPlayCallback, theTime));
-                    }
-                    return (when + parseFloat(q.duration));
-                } 
-                else if (isSilence(q)) {
-                    return (when + parseFloat(q.duration));
-                }
-                else {
+                    return when + duration;
+                } else {
                     error("can't play " + q);
                     return when;
                 }
+            }
+
+            function playQuantum(when, q) {
+                var now = context.currentTime;
+                var start = when == 0 ? now : when;
+                var duration = q.duration * speedFactor;
+                var next = start + duration;
+
+                if (false) {
+                    // let it ride
+                } else {
+                    var audioSource = context.createBufferSource();
+                    audioGain.gain.value = 1;
+                    audioSource.buffer = q.track.buffer;
+                    audioSource.connect(audioGain);
+                    var tduration = q.track.audio_summary.duration - q.start;
+                    audioSource.noteGrainOn(start, q.start, tduration);
+                    if (curAudioSource) {
+                        curAudioSource.noteOff(start);
+                    }
+                    curAudioSource = audioSource;
+                }
+                q.audioSource = curAudioSource;
+                curQ = q;
+                return duration;
             }
 
             function error(s) {
@@ -296,22 +275,26 @@ function createJRemixer(context, jquery, apiKey) {
 
             var player = {
                 play: function(when, q) {
-                    return queuePlay(0, q);
+                    return playQuantum(when, q);
+                    //queuePlay(0, q);
                 },
 
-                addOnPlayCallback: function(callback) {
-                    onPlayCallback = callback;
+                playNow: function(q) {
+                    queuePlay(0, q);
                 },
-        
-                addAfterPlayCallback: function(callback) {
-                    afterPlayCallback = callback;
+
+                playWhen: function(when, q) {
+                    return queuePlay(when, q);
+                },
+
+                addCallback: function(callback) {
                 },
 
                 queue: function(q) {
                     var now = context.currentTime;
                     if (now > queueTime) {
                         queueTime = now;
-                    }
+                    } 
                     queueTime = queuePlay(queueTime, q);
                 },
 
@@ -319,25 +302,41 @@ function createJRemixer(context, jquery, apiKey) {
                     queueTime += duration;
                 },
 
-                stop: function() {
-                    for (var i = 0; i < currentlyQueued.length; i++) {
-                        if (currentlyQueued[i] != null) {
-                            currentlyQueued[i].noteOff(0);
-                        }
-                    }
-                    currentlyQueued = new Array();
+                setSpeedFactor : function(factor) {
+                    speedFactor = factor;
+                },
 
-                    if (currentTriggers.length > 0) {
-                        for (var i = 0; i < currentTriggers.length; i++) {
-                            clearTimeout(currentTriggers[i])
+                getSpeedFactor: function() {
+                    return speedFactor;
+                },
+
+                insertNode: function(node) {
+                    audioGain.disconnect();
+                    node.connect(context.destination);
+                    audioGain.connect(node.input);
+                },
+
+                stop: function(q) {
+                    if (q === undefined) {
+                        if (curAudioSource) {
+                            curAudioSource.noteOff(0);
+                            curAudioSource = null;
                         }
-                        currentTriggers = new Array();
+                        //audioGain.gain.value = 0;
+                        //audioGain.disconnect();
+                    } else {
+                        if ('audioSource' in q) {
+                            if (q.audioSource != null) {
+                                q.audioSource.noteOff(0);
+                            }
+                        }
                     }
+                    curQ = null;
                 },
 
                 curTime: function() {
                     return context.currentTime;
-                },
+                }
             }
             return player;
         },
@@ -360,26 +359,6 @@ function createJRemixer(context, jquery, apiKey) {
             }
             request.send();
         },
-
-        // Saves the remixed audio using the HTML 5 temporary filesystem
-        saveRemixLocally : function(fs, remixed, callback) {
-            fs.root.getFile('my-remix.wav', {create: true}, function(fileEntry) {
-                fileEntry.createWriter(function(fileWriter) {
-                    fileWriter.onwriteend = function(e) {
-                    console.log('Write completed.');
-                    callback(fileEntry.toURL());
-                    };
-                    fileWriter.onerror = function(e) {
-                    console.log('Write failed: ' + e.toString());
-                    };
-
-                    var blob = new Blob([Wav.createWaveFileData(remixed)], {type: 'binary'});
-
-                    fileWriter.write(blob);
-                }, fileErrorHandler);
-            }, fileErrorHandler);
-        },
- 
     };
 
     function isQuantum(a) {
@@ -388,10 +367,6 @@ function createJRemixer(context, jquery, apiKey) {
 
     function isAudioBuffer(a) {
         return 'getChannelData' in a;
-    }
-
-    function isSilence(a) {
-        return 'isSilence' in a;
     }
 
     function trace(text) {
@@ -416,6 +391,7 @@ function euclidean_distance(v1, v2) {
 function timbral_distance(s1, s2) {
     return euclidean_distance(s1.timbre, s2.timbre);
 }
+
 
 function clusterSegments(track, numClusters, fieldName, vecName) {
     var vname = vecName || 'timbre';
@@ -517,161 +493,3 @@ function clusterSegments(track, numClusters, fieldName, vecName) {
     }
     reportClusteringStats();
 }
-
-// Helper functions for handling uploads with Echo Nest support
-function endsWith(str, suffix) {
-    return str.indexOf(suffix, str.length - suffix.length) !== -1;
-}
-
-function fixFileName(name) {
-    name = name.replace(/c:\\fakepath\\/i, '');
-    name = name.replace(/[^A-Z0-9.\-]+/gi, ' ');
-    name = Math.floor(Math.random(10000) * 10000) + ".mp3";
-    return 'remix_audio/' + apiKey + '/' + new Date().getTime() + '/' + name;
-}
-
-function fetchSignature() {
-    var url = 'http://remix.echonest.com/Uploader/verify?callback=?&v=audio'
-    $.getJSON(url, {}, function(data) {
-        policy = data.policy;
-        signature = data.signature;
-        $('#f-policy').val(data.policy);
-        $('#f-signature').val(data.signature);
-        $('#f-key').val(data.key);
-    });
-}
-
-function getProfile(trackID, callback) {
-    var url = 'http://remix.echonest.com/Uploader/profile?callback=?';
-    return $.getJSON(url, {trid: trackID}, callback); 
-}
-
-function urldecode(str) {
-   return decodeURIComponent((str+'').replace(/\+/g, '%20'));
-}
-
-
-// Error handler for writing remixes to wav files
-function fileErrorHandler(e) {
-  var msg = '';
-
-  switch (e.code) {
-    case FileError.QUOTA_EXCEEDED_ERR:
-      msg = 'QUOTA_EXCEEDED_ERR';
-      break;
-    case FileError.NOT_FOUND_ERR:
-      msg = 'NOT_FOUND_ERR';
-      break;
-    case FileError.SECURITY_ERR:
-      msg = 'SECURITY_ERR';
-      break;
-    case FileError.INVALID_MODIFICATION_ERR:
-      msg = 'INVALID_MODIFICATION_ERR';
-      break;
-    case FileError.INVALID_STATE_ERR:
-      msg = 'INVALID_STATE_ERR';
-      break;
-    default:
-      msg = 'Unknown Error';
-      break;
-  };
-
-  console.log('Error: ' + msg);
-}
-
-// Wav code based on Tomás Senart's AudioJEdit - https://github.com/tsenart/audiojedit
-var Wav = {};
-Wav.createWaveFileData = (function() {
-  var writeString = function(s, a, offset) {
-    for (var i = 0; i < s.length; ++i) {
-      a[offset + i] = s.charCodeAt(i);
-    }
-  };
-
-  var writeInt16 = function(n, a, offset) {
-    n = n | 0;
-    a[offset + 0] = n & 255;
-    a[offset + 1] = (n >> 8) & 255;
-  };
-
-  var writeInt32 = function(n, a, offset) {
-    n = n | 0
-    a[offset + 0] = n & 255;
-    a[offset + 1] = (n >> 8) & 255;
-    a[offset + 2] = (n >> 16) & 255;
-    a[offset + 3] = (n >> 24) & 255;
-  };
-
-  var writeAudioBuffer = function(a, offset, quanta) {
-    var bufferL, sampleL, bufferR, sampleR;
-    var currentBuffer;
-
-    for (var q = 0; q < quanta.length; q++) {
-
-        currentBuffer = quanta[q].track.buffer;
-        bufferL = currentBuffer.getChannelData(0);
-        bufferR = currentBuffer.getChannelData(1);
-
-        var start = Math.floor(parseFloat(quanta[q].start) * currentBuffer.sampleRate);
-        var end = Math.floor((parseFloat(quanta[q].start) + parseFloat(quanta[q].duration)) * currentBuffer.sampleRate);
-
-        for (var i = start; i < end; ++i) {
-            sampleL = bufferL[i] * 32768.0;
-            sampleR = bufferR[i] * 32768.0;
-
-            // Clip left and right samples to the limitations of 16-bit.
-            // If we don't do this then we'll get nasty wrap-around distortion.
-            if (sampleL < -32768) { sampleL = -32768; }
-            if (sampleL >  32767) { sampleL =  32767; }
-            if (sampleR < -32768) { sampleR = -32768; }
-            if (sampleR >  32767) { sampleR =  32767; }
-
-            writeInt16(sampleL, a, offset);
-            writeInt16(sampleR, a, offset + 2);
-            offset += 4; 
-        }
-    }
-  };
-
-  return function(quanta) {
-    var remixDuration = 0;
-    for (var q = 0; q < quanta.length; q++) {
-        remixDuration = remixDuration + parseFloat(quanta[q].duration);
-    }
-    var currentBuffer = quanta[0].track.buffer;
-    var frameLength = remixDuration * currentBuffer.sampleRate,
-        numberOfChannels = currentBuffer.numberOfChannels,
-        sampleRate = currentBuffer.sampleRate,
-        bitsPerSample = 16,
-        byteRate = sampleRate * numberOfChannels * bitsPerSample / 8,
-        blockAlign = numberOfChannels * bitsPerSample / 8,
-        wavDataByteLength = frameLength * numberOfChannels * 2, // 16-bit audio
-        headerByteLength = 44,
-        totalLength = headerByteLength + wavDataByteLength,
-        waveFileData = new Uint8Array(totalLength),
-        subChunk1Size = 16, // for linear PCM
-        subChunk2Size = wavDataByteLength,
-        chunkSize = 4 + (8 + subChunk1Size) + (8 + subChunk2Size);
-
-    writeString('RIFF', waveFileData, 0);
-    writeInt32(chunkSize, waveFileData, 4);
-    writeString('WAVE', waveFileData, 8);
-    writeString('fmt ', waveFileData, 12);
-
-    writeInt32(subChunk1Size, waveFileData, 16);      // SubChunk1Size (4)
-    writeInt16(1, waveFileData, 20);                  // AudioFormat (2)
-    writeInt16(numberOfChannels, waveFileData, 22);   // NumChannels (2)
-    writeInt32(sampleRate, waveFileData, 24);         // SampleRate (4)
-    writeInt32(byteRate, waveFileData, 28);           // ByteRate (4)
-    writeInt16(blockAlign, waveFileData, 32);         // BlockAlign (2)
-    writeInt32(bitsPerSample, waveFileData, 34);      // BitsPerSample (4)
-
-    writeString('data', waveFileData, 36);
-    writeInt32(subChunk2Size, waveFileData, 40);      // SubChunk2Size (4)
-
-    // Write actual audio data starting at offset 44.
-    writeAudioBuffer(waveFileData, 44, quanta);
-
-    return waveFileData;
-  }
-}());
