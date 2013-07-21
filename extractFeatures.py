@@ -3,6 +3,8 @@ import sys
 import echonest.remix.audio as audio
 from pyechonest import config
 config.CALL_TIMEOUT=30
+import pickle
+from cluster import regionTypes
 
 # Usage:
 #
@@ -43,20 +45,25 @@ def writeFeaturesToFile( fn, songId, file, Q ):
         file.write( ''.join([ fmtStr%x for x in q.mean_timbre()]) )
         file.write( '\n' )
 
-regionTypes = [ 'bars', 'beats', 'sections', 'tatums' ]
 
 ofileBase = 'songftrs'
 
 # open the out files
 files = []
+filesPkl = []
+
 for t in regionTypes:
     ofn = '%s_%s.csv' % (ofileBase,t)
     files.append( open( ofn, 'w' ) )
 
 # Now, visit each of the song files
+#allres = []
+
 for fn in sys.argv[1:]:
     print 'Processing file %s...' % fn
     au = audio.LocalAudioFile(fn)
+    #allres.append(au) # need whole audio file, refs in analysis
+
     # Write out the analysis data from each of the region types, for all regions
     id = str(au.analysis.identifier)
     #print 'nb bars = ', len(au.analysis.bars)
@@ -68,3 +75,9 @@ for fn in sys.argv[1:]:
 # close dem files
 for f in files:
     f.close()
+
+# # finally pickle the analysis for all songs.
+# print 'pickling...'
+# f = open('songanalysis.pkl','wb')
+# pickle.dump(allres, f)
+# f.close()
