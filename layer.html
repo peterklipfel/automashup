@@ -26,18 +26,22 @@
     } else {
       context = new webkitAudioContext();
 
-      // Load track2bell
-      var request = new XMLHttpRequest();
-      request.open('GET', track2URL, true);
-      request.responseType = 'arraybuffer';
+      load_track = function(url, callback){
+        // Load track2bell
+        var returnBuffer;
+        var request = new XMLHttpRequest();
+        request.open('GET', track2URL, true);
+        request.responseType = 'arraybuffer';
 
-      request.onload = function() {
-      context.decodeAudioData(request.response, function(buffer) {
-        track2Buffer = buffer;
-      });
+        request.onload = function() {
+          context.decodeAudioData(request.response, function(buffer) {
+            callback(buffer);
+          });
+        }
+        request.send();
       }
-      request.send();
 
+      load_track(track2URL, function(buffer) { track2Buffer = buffer; });
 
       remixer = createJRemixer(context, $, apiKey);
       player = remixer.getPlayer();
