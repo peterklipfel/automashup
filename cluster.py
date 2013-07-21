@@ -5,7 +5,7 @@ import echonest.remix.audio as audio
 import scipy
 import matplotlib.pyplot as plt
 
-dbg = 0
+dbg = 1
 ftrDim = 12+12+2
 
 regionTypes = [ 'bars', 'beats', 'sections', 'tatums' ]
@@ -73,6 +73,16 @@ def createFeatureMatrix( aregionList ):
     X = np.zeros( (n,D), dtype=float )
     for i,a in enumerate(aregionList):
         X[i,:] = computeFeatureVector( a )
+    # do some normalisation on X:
+    #    each col to zero mean unit std
+    #    weight duration and loudness much more rel to others
+    colwt = np.ones( X.shape[1] )
+    colwt[0] = 4
+    colwt[1] = 8
+    for i in range( X.shape[1] ):
+        v = X[:,i]
+        X[:,i] = colwt[i] * (X[:,i] - np.mean(v)) / np.std(v)
+    
     return X
 
 def clusterData( X ):
@@ -101,7 +111,7 @@ def computeClusterTxProbs( clids, centroids ):
     assert D.shape == (nbcl,nbcl)
     # Make a transition probability matrix.  prob is inversely proportional to
     # distance between clusters.  The bigger k, the less effect distance has.
-    k = 15.0
+    k = 10.0
     P = np.exp( -(D/k) )
     # no prob of transitioning to self
     for i in range(nbcl):
